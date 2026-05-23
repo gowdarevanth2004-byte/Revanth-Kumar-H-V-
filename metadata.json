@@ -1,0 +1,6 @@
+{
+  "name": "BioLab 3D",
+  "description": "An interactive 3D biology learning experience featuring human anatomy, cell structures, genetics, progress tracking, and an AI biology tutor.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
