@@ -1,494 +1,104 @@
 package com.example.ui.screens
 
-import android.Manifest
-import android.content.pm.PackageManager
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import android.content.Context
+import android.content.Intent
+import android.app.WallpaperManager
+import android.content.ComponentName
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
+import androidx.compose.ui.unit.sp
+import com.example.MyWallpaperService
 import com.example.data.*
-import com.example.ui.components.Biolab3DView
-import com.example.ui.theme.*
+import com.example.ui.components.TimeLeftEarthView
 import com.example.viewmodel.MainViewModel
+import java.text.SimpleDateFormat
+import java.util.*
+import kotlin.math.cos
+import kotlin.math.sin
 
-// --- TAB 1: MODELS EXPLORER HOME SCREEN ---
+// Theme helper: Returns colors according to selected premium theme
 @Composable
-fun ModelsHomeScreen(
-    viewModel: MainViewModel,
-    modifier: Modifier = Modifier
-) {
-    var searchQuery by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf("All") }
-
-    val savedIds by viewModel.savedModelIds.collectAsState()
-    val progressList by viewModel.modelProgressList.collectAsState()
-
-    val filteredList = remember(searchQuery, selectedCategory, savedIds) {
-        BiologyData.models.filter { model ->
-            val matchesSearch = model.name.contains(searchQuery, ignoreCase = true) || 
-                                model.category.contains(searchQuery, ignoreCase = true)
-            val matchesCategory = when (selectedCategory) {
-                "All" -> true
-                "Favorites" -> savedIds.contains(model.id)
-                else -> model.category == selectedCategory
-            }
-            matchesSearch && matchesCategory
-        }
-    }
-
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(CosmicMidnight)
-            .padding(horizontal = 16.dp)
-    ) {
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Title and description block
-        Text(
-            text = "3D Interactive Lab",
-            style = MaterialTheme.typography.headlineMedium,
-            color = ScannerCyan
-        )
-        Text(
-            text = "Tap a biometric model to start active simulation learning.",
-            style = MaterialTheme.typography.bodySmall,
-            color = PaleSlate.copy(alpha = 0.7f),
-            modifier = Modifier.padding(bottom = 12.dp)
-        )
-
-        // Search text field
-        TextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            placeholder = { Text("Search biological systems...") },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = ScannerCyan) },
-            trailingIcon = {
-                if (searchQuery.isNotEmpty()) {
-                    IconButton(onClick = { searchQuery = "" }) {
-                        Icon(Icons.Default.Clear, contentDescription = "Clear")
-                    }
-                }
-            },
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = DarkCardBg,
-                unfocusedContainerColor = DarkCardBg,
-                focusedTextColor = PaleSlate,
-                unfocusedTextColor = PaleSlate,
-                focusedIndicatorColor = ScannerCyan,
-                unfocusedIndicatorColor = Color.Transparent
-            ),
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .testTag("search_field"),
-            singleLine = true
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Category Selection Chips Row
-        LazyRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            item {
-                FilterChip(
-                    selected = selectedCategory == "All",
-                    onClick = { selectedCategory = "All" },
-                    label = { Text("All Systems") },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = ScannerCyan.copy(alpha = 0.3f),
-                        selectedLabelColor = ScannerCyan
-                    )
-                )
-            }
-            item {
-                FilterChip(
-                    selected = selectedCategory == "Favorites",
-                    onClick = { selectedCategory = "Favorites" },
-                    label = { Text("⭐ Saved") },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = InfoAmber.copy(alpha = 0.3f),
-                        selectedLabelColor = InfoAmber
-                    )
-                )
-            }
-            items(BiologyData.categories) { cat ->
-                FilterChip(
-                    selected = selectedCategory == cat,
-                    onClick = { selectedCategory = cat },
-                    label = { Text(cat) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MetabolicGreen.copy(alpha = 0.3f),
-                        selectedLabelColor = MetabolicGreen
-                    )
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Grid contents / Lists
-        if (filteredList.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        Icons.Default.Warning,
-                        contentDescription = "Empty list",
-                        tint = InfoAmber,
-                        modifier = Modifier.size(48.dp)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("No biological systems found matching criteria.", color = PaleSlate.copy(alpha = 0.7f))
-                }
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-                contentPadding = PaddingValues(bottom = 90.dp)
-            ) {
-                items(filteredList) { model ->
-                    val isFav = savedIds.contains(model.id)
-                    val progress = progressList.find { it.modelId == model.id }
-                    val isViewed = progress?.isViewed ?: false
-
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                viewModel.selectedModelId = model.id
-                                viewModel.currentScreen = "details"
-                                viewModel.markModelAsViewed(model.id)
-                            }
-                            .testTag("model_card_${model.id}"),
-                        colors = CardDefaults.cardColors(containerColor = DarkCardBg),
-                        border = BorderStroke(1.dp, if (isFav) InfoAmber.copy(alpha = 0.5f) else Color(0x3300E5FF))
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Mini 3D preview viewport inside card
-                            Box(
-                                modifier = Modifier
-                                    .size(80.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(CosmicMidnight),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Biolab3DView(
-                                    modelId = model.id,
-                                    modifier = Modifier.size(70.dp),
-                                    zoomScale = 0.8f,
-                                    rotationY = 20f
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.width(16.dp))
-
-                            Column(modifier = Modifier.weight(1.0f)) {
-                                Text(
-                                    text = model.name,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = PaleSlate
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = model.category,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = when (model.category) {
-                                        "Human Anatomy" -> ScannerCyan
-                                        "Cell Biology" -> MetabolicGreen
-                                        "Genetics" -> HelixViolet
-                                        else -> InfoAmber
-                                    }
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    if (isViewed) {
-                                        Icon(Icons.Default.Check, contentDescription = "Mastered", tint = MetabolicGreen, modifier = Modifier.size(14.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Explored", style = MaterialTheme.typography.bodySmall, color = MetabolicGreen)
-                                    } else {
-                                        Text("Not explored yet", style = MaterialTheme.typography.bodySmall, color = PaleSlate.copy(alpha = 0.5f))
-                                    }
-                                }
-                            }
-
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                IconButton(onClick = { viewModel.toggleFavorite(model.id) }) {
-                                    Icon(
-                                        imageVector = if (isFav) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                                        contentDescription = "Save favorite",
-                                        tint = if (isFav) InfoAmber else PaleSlate.copy(alpha = 0.5f)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+fun getThemeColorTuple(themeId: String): Pair<Color, Color> {
+    return when (themeId) {
+        "cyberpunk" -> Color(0xFFFF007F) to Color(0xFFFD7E14) // Hot Pink, Sunset Orange
+        "aurora" -> Color(0xFFA855F7) to Color(0xFF3B82F6) // Aurora Violet, Arctic Blue
+        "oled" -> Color(0xFFF59E0B) to Color(0xFF1E1E1E) // High contrast Gold, Charcoal
+        "batman" -> Color(0xFFFFFFFF) to Color(0xFF1A1B20) // The Dark Knight Monochrome (B&W)
+        else -> Color(0xFF00FFCC) to Color(0xFF0A2540) // Neon Matrix, Deep Space
     }
 }
 
-// --- MODEL DETAILED STUDY & SIMULATION SCREEN ---
 @Composable
-fun ModelDetailScreen(
-    viewModel: MainViewModel,
-    modifier: Modifier = Modifier
-) {
-    val model = BiologyData.models.find { it.id == viewModel.selectedModelId } ?: return
-    val savedIds by viewModel.savedModelIds.collectAsState()
-    val isFav = savedIds.contains(model.id)
-
-    var currentRotX by remember { mutableStateOf(0f) }
-    var currentRotY by remember { mutableStateOf(0f) }
-    var currentZoom by remember { mutableStateOf(1.0f) }
-
-    val infiniteTransition = rememberInfiniteTransition(label = "StudyLights")
-    val laserSwipe by infiniteTransition.animateFloat(
-        initialValue = -100f,
-        targetValue = 400f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(3000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "scanner"
-    )
-
-    Column(
-        modifier = modifier
+fun MainContentRouter(viewModel: MainViewModel) {
+    Box(
+        modifier = Modifier
             .fillMaxSize()
-            .background(CosmicMidnight)
+            .background(Color(0xFF030712))
     ) {
-        // App bar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            IconButton(onClick = { viewModel.currentScreen = "home" }) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = ScannerCyan)
-            }
-            Text(
-                text = model.name,
-                style = MaterialTheme.typography.titleMedium,
-                color = PaleSlate,
-                maxLines = 1
-            )
-            IconButton(onClick = { viewModel.toggleFavorite(model.id) }) {
-                Icon(
-                    imageVector = if (isFav) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                    contentDescription = "Favorite",
-                    tint = if (isFav) InfoAmber else PaleSlate
-                )
-            }
-        }
+        // Shared immersive 3D rotating globe background centered in space
+        TimeLeftEarthView(
+            modifier = Modifier.fillMaxSize(),
+            themeColor = getThemeColorTuple(viewModel.selectedThemeId).first,
+            nightColor = getThemeColorTuple(viewModel.selectedThemeId).second,
+            batterySaving = viewModel.isBatterySaving,
+            userQuote = viewModel.userMotto,
+            themeId = viewModel.selectedThemeId
+        )
 
-        // Top Area: Dynamic 3D Renderer Dashboard Viewport (40% Screen space)
+        // Semi-opaque glass overlay for superior layout contrast
+        val glassAlpha = if (viewModel.selectedThemeId == "batman") 0.58f else 0.82f
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(260.dp)
-                .background(DarkSlate)
-                .testTag("3d_viewport"),
-            contentAlignment = Alignment.Center
-        ) {
-            // Radial grid/scaffolding visual guidelines
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val cx = size.width / 2
-                val cy = size.height / 2
-                drawCircle(color = Color(0x1100C853), radius = 60.dp.toPx(), style = Stroke(width = 1f))
-                drawCircle(color = Color(0x0600C853), radius = 120.dp.toPx(), style = Stroke(width = 1f))
-                // Horizontal crosshairs
-                drawLine(color = Color(0x11FFFFFF), start = Offset(0f, cy), end = Offset(size.width, cy))
-                // Sliding cybersecurity scanner laser
-                drawLine(
-                    color = ScannerCyan.copy(alpha = 0.25f),
-                    start = Offset(0f, laserSwipe),
-                    end = Offset(size.width, laserSwipe),
-                    strokeWidth = 3.dp.toPx()
-                )
-            }
+                .fillMaxSize()
+                .background(Color(0xFF030712).copy(alpha = glassAlpha))
+        )
 
-            // Central Renderer block
-            Biolab3DView(
-                modelId = model.id,
-                modifier = Modifier.fillMaxSize(),
-                zoomScale = currentZoom,
-                rotationX = currentRotX,
-                rotationY = currentRotY,
-                onRotationChanged = { rx, ry ->
-                    currentRotX = rx
-                    currentRotY = ry
-                },
-                actionTriggered = viewModel.activeFeatureTriggered,
-                speedFactor = viewModel.activeSpeedFactor,
-                selectedFeatureIndex = viewModel.activeFeatureIndex,
-                onFeatureLabelTapped = { label ->
-                    viewModel.activeFeatureTriggered = !viewModel.activeFeatureTriggered
-                }
-            )
-
-            // Controls overlays inside viewport bottom
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.BottomCenter)
-                    .background(Color(0xD30B100D))
-                    .padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                // Feature action trigger button
-                val actLabel = when (model.id) {
-                    1 -> "Pulse Cell Organelles"
-                    2 -> if (viewModel.activeFeatureTriggered) "Re-Zip DNA Helix" else "Unzip Base Pairs"
-                    3 -> "Tachometer Cycle: Pulse"
-                    5 -> "Trigger Action Impulse"
-                    7 -> "Feed Food Nutrient bolus"
-                    9 -> "Strike to Photosynthesize"
-                    10 -> "Shield Activation / Battlers"
-                    else -> "Toggle Active Mode"
-                }
-
-                Button(
-                    onClick = { viewModel.activeFeatureTriggered = !viewModel.activeFeatureTriggered },
-                    colors = ButtonDefaults.buttonColors(containerColor = MetabolicGreen, contentColor = CosmicMidnight),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.testTag("action_btn")
-                ) {
-                    Text(actLabel, style = MaterialTheme.typography.bodySmall)
-                }
-
-                // Zoom layout control
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Zoom", style = MaterialTheme.typography.bodySmall, color = PaleSlate.copy(alpha = 0.7f))
-                    Slider(
-                        value = currentZoom,
-                        onValueChange = { currentZoom = it },
-                        valueRange = 0.5f..1.8f,
-                        modifier = Modifier.width(100.dp),
-                        colors = SliderDefaults.colors(
-                            thumbColor = ScannerCyan,
-                            activeTrackColor = ScannerCyan
-                        )
-                    )
-                }
-            }
-        }
-
-        // Bottom Area: Interactive Pedagogical Lesson Panels
-        Surface(
-            modifier = Modifier.weight(1.0f).fillMaxWidth(),
-            color = CosmicMidnight
-        ) {
-            LazyColumn(
+        // Screen selection cross-router with scrolling containers
+        Scaffold(
+            containerColor = Color.Transparent,
+            bottomBar = { BottomNavigationHud(viewModel) }
+        ) { innerPadding ->
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                contentPadding = PaddingValues(bottom = 80.dp)
+                    .padding(innerPadding)
             ) {
-                // Pedagogical value message box
-                item {
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = ScannerCyan.copy(alpha = 0.1f)),
-                        border = BorderStroke(1.dp, ScannerCyan.copy(alpha = 0.3f))
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text("Pedagogical Value", style = MaterialTheme.typography.titleSmall, color = ScannerCyan)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(model.pedagogicalValue, style = MaterialTheme.typography.bodySmall, color = PaleSlate)
-                        }
-                    }
-                }
-
-                // Core details text
-                item {
-                    Text("Detailed Curriculum Overview", style = MaterialTheme.typography.titleMedium, color = ScannerCyan)
-                    Text("Study each of the 10 core physiological principles below. Highlighted entries trigger visual canvas alerts.", style = MaterialTheme.typography.bodySmall, color = PaleSlate.copy(alpha = 0.7f))
-                }
-
-                // Sequenced numbered lesson cards
-                items(model.infoPoints.size) { index ->
-                    val pointStr = model.infoPoints[index]
-                    val parts = pointStr.split(": ", limit = 2)
-                    val label = parts.getOrNull(0) ?: "Fact"
-                    val desc = parts.getOrNull(1) ?: pointStr
-
-                    val isHighlighted = viewModel.activeFeatureIndex == index
-
-                    Card(
-                        onClick = {
-                            // Highlights the item on list, and triggers visual overlay in canvas!
-                            viewModel.activeFeatureIndex = if (isHighlighted) -1 else index
-                        },
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (isHighlighted) ScannerCyan.copy(alpha = 0.15f) else DarkCardBg
-                        ),
-                        border = BorderStroke(
-                            1.dp,
-                            if (isHighlighted) ScannerCyan else Color(0x1100E5FF)
-                        )
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp).fillMaxWidth()) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(24.dp)
-                                        .background(if (isHighlighted) ScannerCyan else DarkSlate, CircleShape),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "${index + 1}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = if (isHighlighted) CosmicMidnight else PaleSlate
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Text(
-                                    text = label,
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = if (isHighlighted) ScannerCyan else PaleSlate
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(text = desc, style = MaterialTheme.typography.bodySmall, color = PaleSlate.copy(alpha = 0.82f))
-                        }
+                AnimatedContent(
+                    targetState = viewModel.currentScreen,
+                    transitionSpec = {
+                        fadeIn(animationSpec = tween(220)) togetherWith fadeOut(animationSpec = tween(150))
+                    },
+                    label = "DashboardTransition"
+                ) { screen ->
+                    when (screen) {
+                        "home" -> HomeScreenDashboard(viewModel)
+                        "wallpaper" -> LiveWallpaperSetupScreen(viewModel)
+                        "stats" -> ScreenTimeStatsScreen(viewModel)
+                        "settings" -> PersonalSettingsScreen(viewModel)
+                        else -> HomeScreenDashboard(viewModel)
                     }
                 }
             }
@@ -496,719 +106,798 @@ fun ModelDetailScreen(
     }
 }
 
-// --- TAB 2: INTERACTIVE BIOLOGY QUIZ LAB ---
+// --- SCREEN 1: MOTIVATIONAL DASHBOARD HOME SCREEN ---
 @Composable
-fun QuizLabScreen(
-    viewModel: MainViewModel,
-    modifier: Modifier = Modifier
-) {
-    val scoresList by viewModel.quizScoresList.collectAsState()
+fun HomeScreenDashboard(viewModel: MainViewModel) {
+    val themeColor = getThemeColorTuple(viewModel.selectedThemeId).first
+    val scrollState = rememberScrollState()
 
     Column(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxSize()
-            .background(CosmicMidnight)
-            .padding(16.dp)
+            .verticalScroll(scrollState)
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(16.dp))
-        Text("Active Quiz Laboratory", style = MaterialTheme.typography.headlineMedium, color = ScannerCyan)
-        Text("Review concepts via targeted multiple-choice challenges.", style = MaterialTheme.typography.bodySmall, color = PaleSlate.copy(alpha = 0.7f))
+        Spacer(modifier = Modifier.height(24.dp))
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        if (viewModel.showQuizFinished) {
-            // Display Results Screen
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 24.dp),
-                colors = CardDefaults.cardColors(containerColor = DarkCardBg),
-                border = BorderStroke(2.dp, MetabolicGreen)
-            ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text("Session Completed! 🎓", style = MaterialTheme.typography.headlineSmall, color = MetabolicGreen)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "${viewModel.activeQuizScore} / ${BiologyData.quizQuestions.size}",
-                        style = MaterialTheme.typography.displayMedium,
-                        color = ScannerCyan
-                    )
-                    Text("Accurate Answers Checked", style = MaterialTheme.typography.bodyMedium, color = PaleSlate)
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    val message = when {
-                        viewModel.activeQuizScore == BiologyData.quizQuestions.size -> "Flawless score! You have achieved true cellular mastery!"
-                        viewModel.activeQuizScore >= 7 -> "Outstanding biological accuracy! You are ready for college studies."
-                        else -> "Good effort. Review information cards to double-check core cell functions."
-                    }
-                    Text(message, style = MaterialTheme.typography.bodySmall, color = PaleSlate.copy(alpha = 0.8f))
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    Button(
-                        onClick = { viewModel.startNewQuiz() },
-                        colors = ButtonDefaults.buttonColors(containerColor = MetabolicGreen, contentColor = CosmicMidnight),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("restart_quiz_button")
-                    ) {
-                        Text("Initiate New Assessment")
-                    }
-                }
-            }
-        } else {
-            // Standard ongoing Quiz UI card
-            val currentQuestion = BiologyData.quizQuestions[viewModel.quizActiveIndex]
-
-            // Question counter
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Question ${viewModel.quizActiveIndex + 1} of ${BiologyData.quizQuestions.size}",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = ScannerCyan
-                )
-                Text(
-                    text = "Accuracy: ${viewModel.activeQuizScore} hits",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MetabolicGreen
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Progress bar
-            LinearProgressIndicator(
-                progress = { (viewModel.quizActiveIndex + 1) / BiologyData.quizQuestions.size.toFloat() },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(6.dp)
-                    .clip(RoundedCornerShape(3.dp)),
-                color = ScannerCyan,
-                trackColor = DarkSlate
+        // Visual digital typography heading
+        Text(
+            text = "TIME LEFT TODAY",
+            style = MaterialTheme.typography.labelLarge.copy(
+                letterSpacing = 3.sp,
+                color = Color.White.copy(alpha = 0.6f),
+                fontWeight = FontWeight.Bold
             )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Question Box card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = DarkCardBg),
-                border = BorderStroke(1.dp, ScannerCyan.copy(alpha = 0.5f))
-            ) {
-                Text(
-                    text = currentQuestion.question,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = PaleSlate,
-                    modifier = Modifier.padding(16.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Options cards
-            Column(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.weight(1.0f)
-            ) {
-                currentQuestion.options.forEachIndexed { optIndex, text ->
-                    val isSelected = viewModel.selectedOptionIndex == optIndex
-                    val isCorr = currentQuestion.correctAnswerIndex == optIndex
-
-                    val cardCol = when {
-                        viewModel.isSubmitted && isCorr -> MetabolicGreen.copy(alpha = 0.2f)
-                        viewModel.isSubmitted && isSelected && !isCorr -> Color(0x33EF5350)
-                        isSelected -> ScannerCyan.copy(alpha = 0.2f)
-                        else -> DarkCardBg
-                    }
-
-                    val borderCol = when {
-                        viewModel.isSubmitted && isCorr -> MetabolicGreen
-                        viewModel.isSubmitted && isSelected && !isCorr -> Color(0xFFEF5350)
-                        isSelected -> ScannerCyan
-                        else -> Color(0x22FFFFFF)
-                    }
-
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(enabled = !viewModel.isSubmitted) { viewModel.selectedOptionIndex = optIndex }
-                            .testTag("option_${optIndex}"),
-                        colors = CardDefaults.cardColors(containerColor = cardCol),
-                        border = BorderStroke(1.5.dp, borderCol)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = when (optIndex) {
-                                    0 -> "A"
-                                    1 -> "B"
-                                    2 -> "C"
-                                    else -> "D"
-                                },
-                                style = MaterialTheme.typography.titleSmall,
-                                color = if (isSelected) ScannerCyan else PaleSlate.copy(alpha = 0.5f)
-                            )
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Text(text = text, style = MaterialTheme.typography.bodySmall, color = PaleSlate)
-                        }
-                    }
-                }
-            }
-
-            // Explanatory Panel
-            if (viewModel.isSubmitted) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 12.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0x2200E5FF)),
-                    border = BorderStroke(1.dp, ScannerCyan.copy(alpha = 0.3f))
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text("Teacher Explanation", style = MaterialTheme.typography.titleSmall, color = ScannerCyan)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(currentQuestion.explanation, style = MaterialTheme.typography.bodySmall, color = PaleSlate)
-                    }
-                }
-            }
-
-            // Lower Action panel button
-            Spacer(modifier = Modifier.height(10.dp))
-            Button(
-                onClick = {
-                    if (!viewModel.isSubmitted) {
-                        viewModel.submitAnswer()
-                    } else {
-                        viewModel.nextQuizStep()
-                    }
-                },
-                enabled = viewModel.selectedOptionIndex != null,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (viewModel.isSubmitted) ScannerCyan else MetabolicGreen,
-                    contentColor = CosmicMidnight
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .testTag("quiz_action_button")
-            ) {
-                Text(
-                    text = if (!viewModel.isSubmitted) "Submit Diagnostics" else "Advance to Next Topic",
-                    style = MaterialTheme.typography.titleSmall
-                )
-            }
-        }
-    }
-}
-
-// --- TAB 3: AI BIOLOGY ASSISTANT SCREEN ---
-@Composable
-fun AiAssistantScreen(
-    viewModel: MainViewModel,
-    modifier: Modifier = Modifier
-) {
-    var chatMessage by remember { mutableStateOf("") }
-    val listState = rememberScrollState()
-
-    // Autoscroll chat on message updates
-    LaunchedEffect(viewModel.chatHistory.size) {
-        listState.animateScrollTo(listState.maxValue)
-    }
-
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(CosmicMidnight)
-            .padding(16.dp)
-    ) {
-        Spacer(modifier = Modifier.height(16.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text("AI Biology Assistant", style = MaterialTheme.typography.headlineMedium, color = ScannerCyan)
-                Text("Query any curriculum syllabus or biological concept here.", style = MaterialTheme.typography.bodySmall, color = PaleSlate.copy(alpha = 0.7f))
-            }
-            IconButton(onClick = { viewModel.clearChat() }) {
-                Icon(Icons.Default.Refresh, contentDescription = "Clear thread", tint = ScannerCyan)
-            }
-        }
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        // Large Chat scroll dialog
-        Column(
-            modifier = Modifier
-                .weight(1.0f)
-                .verticalScroll(listState)
-                .fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            viewModel.chatHistory.forEach { (text, isUser) ->
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = if (isUser) Alignment.CenterEnd else Alignment.CenterStart
-                ) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(0.85f),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (isUser) DarkSlate else DarkCardBg
-                        ),
-                        border = BorderStroke(
-                            1.dp,
-                            if (isUser) ScannerCyan.copy(alpha = 0.5f) else Color(0x3300C853)
-                        )
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text(
-                                text = if (isUser) "You" else "Professor Protoplasm 👨‍🔬",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = if (isUser) ScannerCyan else MetabolicGreen
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(text = text, style = MaterialTheme.typography.bodySmall, color = PaleSlate)
-                        }
-                    }
-                }
-            }
-
-            if (viewModel.isAiLoading) {
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.CenterStart
-                ) {
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = DarkCardBg),
-                        border = BorderStroke(1.dp, Color(0x3300C853))
-                    ) {
-                        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            CircularProgressIndicator(modifier = Modifier.size(16.dp), color = MetabolicGreen, strokeWidth = 2.dp)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Cell synthesis in progress...", style = MaterialTheme.typography.bodySmall, color = PaleSlate.copy(alpha = 0.5f))
-                        }
-                    }
-                }
-            }
-        }
-
-        // Suggested prompts shelf
-        Spacer(modifier = Modifier.height(10.dp))
-        Text("Teacher Suggestions", style = MaterialTheme.typography.bodySmall, color = PaleSlate.copy(alpha = 0.4f))
-        LazyRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            val suggestions = listOf(
-                "Explain mitochondria energy production simplemente",
-                "What's the difference between animal and plant cells?",
-                "Tell me how DNA transcription encodes traits"
-            )
-            items(suggestions) { keyword ->
-                SuggestionChip(
-                    onClick = { viewModel.sendChatMessage(keyword) },
-                    label = { Text(keyword, maxLines = 1) },
-                    colors = SuggestionChipDefaults.suggestionChipColors(
-                        labelColor = ScannerCyan,
-                        containerColor = DarkSlate
-                    )
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // Input bottom bar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 60.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            TextField(
-                value = chatMessage,
-                onValueChange = { chatMessage = it },
-                placeholder = { Text("Ask about ATP, DNA, cells...") },
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = DarkCardBg,
-                    unfocusedContainerColor = DarkCardBg,
-                    focusedTextColor = PaleSlate,
-                    unfocusedTextColor = PaleSlate,
-                    focusedIndicatorColor = ScannerCyan,
-                    unfocusedIndicatorColor = Color.Transparent
-                ),
-                modifier = Modifier
-                    .weight(1.0f)
-                    .clip(RoundedCornerShape(12.dp))
-                    .testTag("ai_input_text"),
-                singleLine = true
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            IconButton(
-                onClick = {
-                    val prompt = chatMessage
-                    chatMessage = ""
-                    viewModel.sendChatMessage(prompt)
-                },
-                modifier = Modifier
-                    .background(ScannerCyan, CircleShape)
-                    .size(48.dp)
-                    .testTag("ai_send_button"),
-                enabled = chatMessage.isNotEmpty() && !viewModel.isAiLoading
-            ) {
-                Icon(Icons.Default.Send, contentDescription = "Send prompt", tint = CosmicMidnight)
-            }
-        }
-    }
-}
-
-// --- TAB 4: MOCK BIOMETRIC AR LAB ---
-@Composable
-fun ArLabScreen(
-    viewModel: MainViewModel,
-    modifier: Modifier = Modifier
-) {
-    val context = LocalContext.current
-    var hasCameraPermission by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.CAMERA
-            ) == PackageManager.PERMISSION_GRANTED
         )
-    }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-        onResult = { granted ->
-            hasCameraPermission = granted
-        }
-    )
+        Spacer(modifier = Modifier.height(20.dp))
 
-    var arModelIndex by remember { mutableStateOf(1) }
-    val arModel = remember(arModelIndex) { BiologyData.models.find { it.id == arModelIndex }!! }
-
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(CosmicMidnight)
-            .padding(16.dp)
-    ) {
-        Spacer(modifier = Modifier.height(16.dp))
-        Text("AR Biometric Simulator", style = MaterialTheme.typography.headlineMedium, color = ScannerCyan)
-        Text("Overlay biological specimens inside physical environments dynamically.", style = MaterialTheme.typography.bodySmall, color = PaleSlate.copy(alpha = 0.7f))
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        // Main camera/grid layout
+        // Large Circular Pulsing Timer Core
         Box(
             modifier = Modifier
-                .weight(1.0f)
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(if (hasCameraPermission) Color.DarkGray else DarkCardBg)
-                .border(2.dp, ScannerCyan, RoundedCornerShape(16.dp)),
+                .size(230.dp)
+                .testTag("circular_timer_core"),
             contentAlignment = Alignment.Center
         ) {
-            if (!hasCameraPermission) {
-                // Background grid shader
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    for (i in 0..size.width.toInt() step 50) {
-                        drawLine(color = Color(0x3300C853), start = Offset(i.toFloat(), 0f), end = Offset(i.toFloat(), size.height))
-                    }
-                    for (i in 0..size.height.toInt() step 50) {
-                        drawLine(color = Color(0x3300C853), start = Offset(0f, i.toFloat()), end = Offset(size.width, i.toFloat()))
-                    }
-                }
-                
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(24.dp)
-                ) {
-                    Icon(Icons.Default.Star, contentDescription = "Camera AR", tint = ScannerCyan, modifier = Modifier.size(54.dp))
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text("Interactive Studio Grid", style = MaterialTheme.typography.titleMedium, color = PaleSlate)
-                    Text("Enable camera permission to enter immersive local background overlays, or study the 3D projection directly in the grid below.", style = MaterialTheme.typography.bodySmall, color = PaleSlate.copy(alpha = 0.6f), modifier = Modifier.padding(horizontal = 8.dp))
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(
-                        onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) },
-                        colors = ButtonDefaults.buttonColors(containerColor = ScannerCyan, contentColor = CosmicMidnight)
-                    ) {
-                        Text("Permit Live Camera Overlay")
-                    }
-                }
-            } else {
-                // If has camera permission, we mock the laboratory view backdrop with cyber contours!
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    drawRect(color = Color(0x730B100D))
-                    // Scanning cyber bounding targets
-                    val gap = 40f
-                    drawLine(color = ScannerCyan, start = Offset(gap, gap), end = Offset(gap + 40f, gap), strokeWidth = 4f)
-                    drawLine(color = ScannerCyan, start = Offset(gap, gap), end = Offset(gap, gap + 40f), strokeWidth = 4f)
-
-                    drawLine(color = ScannerCyan, start = Offset(size.width - gap, gap), end = Offset(size.width - gap - 40f, gap), strokeWidth = 4f)
-                    drawLine(color = ScannerCyan, start = Offset(size.width - gap, gap), end = Offset(size.width - gap, gap + 40f), strokeWidth = 4f)
-
-                    drawLine(color = ScannerCyan, start = Offset(gap, size.height - gap), end = Offset(gap + 40f, size.height - gap), strokeWidth = 4f)
-                    drawLine(color = ScannerCyan, start = Offset(gap, size.height - gap), end = Offset(gap, size.height - gap - 40f), strokeWidth = 4f)
-
-                    drawLine(color = ScannerCyan, start = Offset(size.width - gap, size.height - gap), end = Offset(size.width - gap - 40f, size.height - gap), strokeWidth = 4f)
-                    drawLine(color = ScannerCyan, start = Offset(size.width - gap, size.height - gap), end = Offset(size.width - gap, size.height - gap - 40f), strokeWidth = 4f)
-                }
+            // Background track
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                drawCircle(
+                    color = themeColor.copy(alpha = 0.08f),
+                    radius = size.width / 2,
+                    style = Stroke(width = 8.dp.toPx())
+                )
             }
 
-            // Interactive rotating model projection on top of viewport
-            Biolab3DView(
-                modelId = arModelIndex,
-                modifier = Modifier.size(240.dp),
-                zoomScale = 1.3f
+            // Animated sweeping indicator outline
+            val baseRotation = rememberInfiniteTransition("IndicatorSweeps")
+            val sweepProgress by baseRotation.animateFloat(
+                initialValue = 0f,
+                targetValue = 360f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(12000, easing = LinearEasing)
+                ),
+                label = "IndicatorSweep"
             )
 
-            // Current specimen label card
-            Card(
-                colors = CardDefaults.cardColors(containerColor = CosmicMidnight.copy(alpha = 0.8f)),
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(12.dp)
-            ) {
-                Text(
-                    text = "Specimen Core: ${arModel.name}",
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = ScannerCyan
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                drawArc(
+                    color = themeColor,
+                    startAngle = -90f,
+                    sweepAngle = 360f * viewModel.percentLeftToday,
+                    useCenter = false,
+                    style = Stroke(width = 12.dp.toPx())
                 )
             }
-        }
 
-        Spacer(modifier = Modifier.height(14.dp))
-
-        //specimen selector lists
-        Text("Select Specimen", style = MaterialTheme.typography.bodySmall, color = PaleSlate.copy(alpha = 0.5f))
-        LazyRow(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 60.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(BiologyData.models) { item ->
-                FilterChip(
-                    selected = arModelIndex == item.id,
-                    onClick = { arModelIndex = item.id },
-                    label = { Text(item.name.take(15) + "...") },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = ScannerCyan.copy(alpha = 0.3f),
-                        selectedLabelColor = ScannerCyan
+            // Central time text
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        text = viewModel.hoursLeftToday,
+                        fontSize = 42.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Black,
+                        color = themeColor
                     )
+                    Text(
+                        text = "h",
+                        fontSize = 18.sp,
+                        color = Color.White.copy(alpha = 0.6f),
+                        modifier = Modifier.padding(bottom = 6.dp, start = 2.dp, end = 6.dp)
+                    )
+                    Text(
+                        text = viewModel.minutesLeftToday,
+                        fontSize = 42.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Black,
+                        color = themeColor
+                    )
+                    Text(
+                        text = "m",
+                        fontSize = 18.sp,
+                        color = Color.White.copy(alpha = 0.6f),
+                        modifier = Modifier.padding(bottom = 6.dp, start = 2.dp, end = 6.dp)
+                    )
+                }
+                Text(
+                    text = "${viewModel.secondsLeftToday} seconds remaining",
+                    fontSize = 13.sp,
+                    color = Color.White.copy(alpha = 0.5f)
                 )
             }
         }
-    }
-}
 
-// --- TAB 5: LEARNER'S STATS/PROGRESS DASHBOARD SCREEN ---
-@Composable
-fun ProgressDashboardScreen(
-    viewModel: MainViewModel,
-    modifier: Modifier = Modifier
-) {
-    val progressList by viewModel.modelProgressList.collectAsState()
-    val scoresList by viewModel.quizScoresList.collectAsState()
-    val streakRecord by viewModel.userStreak.collectAsState()
+        Spacer(modifier = Modifier.height(30.dp))
 
-    val completedPercentage = remember(progressList) {
-        val count = progressList.count { it.isViewed }
-        if (BiologyData.models.isEmpty()) 0 else (count * 100) / BiologyData.models.size
-    }
-
-    val averageScore = remember(scoresList) {
-        if (scoresList.isEmpty()) 0 else {
-            val totalHits = scoresList.sumOf { it.score }
-            val totalQuestions = scoresList.sumOf { it.totalQuestions }
-            if (totalQuestions == 0) 0 else (totalHits * 100) / totalQuestions
+        // Personal motto card banner
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A).copy(alpha = 0.6f)),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, themeColor.copy(alpha = 0.15f))
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    Icons.Default.Star,
+                    contentDescription = "Mantra Alert",
+                    tint = themeColor,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "\"${viewModel.userMotto}\"",
+                    fontSize = 16.sp,
+                    fontStyle = FontStyle.Italic,
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
-    }
-
-    val currentStreak = streakRecord?.streakCount ?: 0
-    val totalConsults = streakRecord?.totalAiQuestions ?: 0
-
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(CosmicMidnight)
-            .padding(16.dp)
-            .verticalScroll(rememberScrollState())
-    ) {
-        Spacer(modifier = Modifier.height(16.dp))
-        Text("Biometric Assessment", style = MaterialTheme.typography.headlineMedium, color = ScannerCyan)
-        Text("Review curriculum accomplishments and daily streaks log.", style = MaterialTheme.typography.bodySmall, color = PaleSlate.copy(alpha = 0.7f))
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Streaks and summary indicators row
+        // Progress breakdown block: Year Progress & Productivity Rating
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Daily Streak card
+            // Year progress card
             Card(
-                modifier = Modifier.weight(1.0f),
-                colors = CardDefaults.cardColors(containerColor = DarkCardBg),
-                border = BorderStroke(1.dp, Color(0xFFFF9800))
+                modifier = Modifier.weight(1f),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A).copy(alpha = 0.6f)),
+                shape = RoundedCornerShape(16.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(14.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text("Daily Streak 🔥", style = MaterialTheme.typography.bodySmall, color = Color(0xFFFF9800))
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        "THIS YEAR",
+                        color = Color.White.copy(alpha = 0.4f),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("$currentStreak", style = MaterialTheme.typography.headlineMedium, color = Color(0xFFFFB74D))
-                    Text("Consecutive Days", style = MaterialTheme.typography.bodySmall, color = PaleSlate.copy(alpha = 0.5f))
+                    Text(
+                        "${viewModel.daysLeftThisYear} DAYS",
+                        color = themeColor,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                    Text(
+                        "Left to accomplish goals",
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontSize = 11.sp
+                    )
                 }
             }
 
-            // AI interactions card
+            // Screen productivity score card
             Card(
-                modifier = Modifier.weight(1.0f),
-                colors = CardDefaults.cardColors(containerColor = DarkCardBg),
-                border = BorderStroke(1.dp, ScannerCyan)
+                modifier = Modifier.weight(1f),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A).copy(alpha = 0.6f)),
+                shape = RoundedCornerShape(16.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(14.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text("AI Consults 🔬", style = MaterialTheme.typography.bodySmall, color = ScannerCyan)
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        "PRODUCTIVITY",
+                        color = Color.White.copy(alpha = 0.4f),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("$totalConsults", style = MaterialTheme.typography.headlineMedium, color = ScannerCyan)
-                    Text("Inquiries asked", style = MaterialTheme.typography.bodySmall, color = PaleSlate.copy(alpha = 0.5f))
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        // Progress mastery gauges Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = DarkCardBg),
-            border = BorderStroke(1.dp, ScannerCyan.copy(alpha = 0.5f))
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    Text("Syllabus Mastery", style = MaterialTheme.typography.titleMedium, color = PaleSlate)
-                    Text("Completed exploration tasks", style = MaterialTheme.typography.bodySmall, color = PaleSlate.copy(alpha = 0.6f))
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(text = "$completedPercentage%", style = MaterialTheme.typography.displayMedium, color = MetabolicGreen)
-                }
-
-                // Simple Circular progress ring chart
-                Box(
-                    modifier = Modifier.size(80.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(
-                        progress = { completedPercentage / 100f },
-                        modifier = Modifier.fillMaxSize(),
-                        color = MetabolicGreen,
-                        trackColor = DarkSlate,
-                        strokeWidth = 10.dp
+                    Text(
+                        "${viewModel.productivityScore}%",
+                        color = themeColor,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                    Text(
+                        "Focus efficiency rating",
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontSize = 11.sp
                     )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(40.dp))
+    }
+}
 
-        // Quiz metrics score performance Card
+// --- SCREEN 2: LIVE WALLPAPER INSTRUCTIONS & CONFIG PORTAL ---
+@Composable
+fun LiveWallpaperSetupScreen(viewModel: MainViewModel) {
+    val context = LocalContext.current
+    val themeColor = getThemeColorTuple(viewModel.selectedThemeId).first
+    val scrollState = rememberScrollState()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            "LIVE WALLPAPER",
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Black,
+            color = themeColor
+        )
+        Text(
+            "Configure motivational live countdowns on home / lock screen",
+            fontSize = 13.sp,
+            color = Color.White.copy(alpha = 0.6f),
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(bottom = 24.dp)
+        )
+
+        // Wallpaper dynamic mockup container
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(220.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF030712).copy(alpha = 0.4f)),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.5.dp, themeColor.copy(alpha = 0.4f))
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                // Interactive miniature earth view inside card
+                TimeLeftEarthView(
+                    modifier = Modifier.fillMaxSize(),
+                    themeColor = themeColor,
+                    nightColor = getThemeColorTuple(viewModel.selectedThemeId).second,
+                    batterySaving = viewModel.isBatterySaving
+                )
+                
+                // Text overlay previews
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("WALLPAPER MOCKUP", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.4f))
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("${viewModel.hoursLeftToday}:${viewModel.minutesLeftToday}:${viewModel.secondsLeftToday}", color = themeColor, fontSize = 28.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        Text(viewModel.userMotto.uppercase(), color = Color.White.copy(alpha = 0.8f), fontSize = 11.sp, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Steps instructions list
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = DarkCardBg),
-            border = BorderStroke(1.dp, MetabolicGreen.copy(alpha = 0.5f))
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A).copy(alpha = 0.5f))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("How to apply wallpaper:", fontWeight = FontWeight.Bold, color = Color.White)
+                Spacer(modifier = Modifier.height(12.dp))
+                Text("1. Confirm your motto & premium styling are set in the Settings tab.", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+                Spacer(modifier = Modifier.height(6.dp))
+                Text("2. Press the 'Set Live Wallpaper' action trigger button below.", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+                Spacer(modifier = Modifier.height(6.dp))
+                Text("3. Choose to install on either Home Screen, Lock Screen, or Both screens when prompted by the OS.", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Launcher trigger button
+        Button(
+            onClick = {
+                try {
+                    val intent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {
+                        putExtra(
+                            WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
+                            ComponentName(context, MyWallpaperService::class.java)
+                        )
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(intent)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            },
+            colors = ButtonDefaults.buttonColors(containerColor = themeColor, contentColor = Color(0xFF030712)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp)
+                .testTag("apply_wallpaper_btn")
+        ) {
+            Icon(Icons.Default.PlayArrow, contentDescription = "Launch wallpaper chooser")
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("SET LIVE WALLPAPER", fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+// --- SCREEN 3: SCREEN TIME TRACKING & PRODUCTIVITY HISTORY ---
+@Composable
+fun ScreenTimeStatsScreen(viewModel: MainViewModel) {
+    val themeColor = getThemeColorTuple(viewModel.selectedThemeId).first
+    val scrollState = rememberScrollState()
+    val dailyStats by viewModel.dailyStatsList.collectAsState()
+
+    // Trigger update on open
+    LaunchedEffect(Unit) {
+        viewModel.checkUsageStatsPermission()
+        viewModel.refreshScreenTimeStats()
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            "SCREEN TIME TRACKER",
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Black,
+            color = themeColor
+        )
+        Text(
+            "Measure physical habits using Android Usage Stats systems",
+            fontSize = 13.sp,
+            color = Color.White.copy(alpha = 0.6f),
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(bottom = 20.dp)
+        )
+
+        // Permission handler card block
+        if (!viewModel.isUsagePermissionGranted) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF7F1D1D).copy(alpha = 0.4f)),
+                border = BorderStroke(1.dp, Color(0xFFEF4444)),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Default.Warning, contentDescription = "Lock", tint = Color(0xFFFCA5A5), modifier = Modifier.size(32.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Permission Required", fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(
+                        "Time Left needs standard usage monitoring authorization to fetch screen minutes securely.",
+                        color = Color(0xFFFECACA),
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                    Button(
+                        onClick = { viewModel.openUsageSettings() },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Authorize Access Setting")
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        // Live statistics indicators
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A).copy(alpha = 0.6f)),
+            shape = RoundedCornerShape(16.dp)
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(20.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text("Quiz Diagnostics hits", style = MaterialTheme.typography.titleMedium, color = PaleSlate)
-                    Text("Composite accuracy percent", style = MaterialTheme.typography.bodySmall, color = PaleSlate.copy(alpha = 0.6f))
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(text = "$averageScore%", style = MaterialTheme.typography.displayMedium, color = ScannerCyan)
+                    Text("SCREEN TIME USED TODAY", color = Color.White.copy(alpha = 0.5f), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "${viewModel.screenTimeMinutesToday.toInt()} mins",
+                        color = themeColor,
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Black
+                    )
                 }
 
-                Box(
-                    modifier = Modifier.size(80.dp),
-                    contentAlignment = Alignment.Center
+                Button(
+                    onClick = { viewModel.refreshScreenTimeStats() },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.1f)),
+                    shape = CircleShape,
+                    contentPadding = PaddingValues(10.dp)
                 ) {
-                    CircularProgressIndicator(
-                        progress = { averageScore / 100f },
-                        modifier = Modifier.fillMaxSize(),
-                        color = ScannerCyan,
-                        trackColor = DarkSlate,
-                        strokeWidth = 10.dp
-                    )
+                    Icon(Icons.Default.Refresh, contentDescription = "Reload Stats", tint = themeColor)
                 }
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Category completion summary table list
-        Text("Tracked Curriculum Milestones", style = MaterialTheme.typography.titleSmall, color = ScannerCyan)
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Column(
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(bottom = 90.dp)
+        // Custom Vector Weekly Progress Area Charts drawn purely in Jetpack Compose Canvas!
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A).copy(alpha = 0.6f)),
+            shape = RoundedCornerShape(16.dp)
         ) {
-            BiologyData.categories.forEach { category ->
-                val categoryModelsCount = BiologyData.models.count { it.category == category }
-                val viewCount = progressList.count { p ->
-                    val model = BiologyData.models.find { it.id == p.modelId }
-                    model?.category == category && p.isViewed
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    "7-DAY HISTORY LOG",
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White.copy(alpha = 0.5f),
+                    fontSize = 12.sp
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Line Plot Canvas rendering
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(150.dp)
+                ) {
+                    val entries = dailyStats.filter { it.dateStr != "MIGRATION_STATUS_DO_NOT_DELETE" }.take(7).reversed()
+                    
+                    if (entries.isNotEmpty()) {
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            val maxTime = maxOf(300f, entries.maxOf { it.screenTimeMinutes.toFloat() })
+                            val pointsCount = entries.size
+                            val stepX = size.width / (pointsCount - 1).coerceAtLeast(1)
+
+                            // Generate path vectors
+                            val path = androidx.compose.ui.graphics.Path()
+                            val fillPath = androidx.compose.ui.graphics.Path()
+
+                            entries.forEachIndexed { idx, stat ->
+                                val x = idx * stepX
+                                val ratio = stat.screenTimeMinutes.toFloat() / maxTime
+                                val y = size.height - (ratio * (size.height - 20f))
+
+                                if (idx == 0) {
+                                    path.moveTo(x, y)
+                                    fillPath.moveTo(x, size.height)
+                                    fillPath.lineTo(x, y)
+                                } else {
+                                    path.lineTo(x, y)
+                                    fillPath.lineTo(x, y)
+                                }
+
+                                if (idx == pointsCount - 1) {
+                                    fillPath.lineTo(x, size.height)
+                                    fillPath.close()
+                                }
+
+                                // Plot item nodes
+                                drawCircle(
+                                    color = themeColor,
+                                    radius = 4.dp.toPx(),
+                                    center = Offset(x, y)
+                                )
+                            }
+
+                            // Render area gradient shading
+                            drawPath(
+                                path = fillPath,
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(themeColor.copy(alpha = 0.25f), Color.Transparent)
+                                )
+                            )
+
+                            // Draw central trace outline
+                            drawPath(
+                                path = path,
+                                color = themeColor,
+                                style = Stroke(width = 3.dp.toPx())
+                            )
+                        }
+                    } else {
+                        // Empty outline fallback
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("Loading daily statistics history...", fontSize = 12.sp, color = Color.White.copy(alpha = 0.4f))
+                        }
+                    }
                 }
 
-                Card(
+                // Days axis labels
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = DarkSlate)
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(category, style = MaterialTheme.typography.titleSmall, color = PaleSlate)
-                            Text("$viewCount of $categoryModelsCount mastered.", style = MaterialTheme.typography.bodySmall, color = PaleSlate.copy(alpha = 0.5f))
+                    val entries = dailyStats.filter { it.dateStr != "MIGRATION_STATUS_DO_NOT_DELETE" }.take(7).reversed()
+                    if (entries.isNotEmpty()) {
+                        entries.forEach { stat ->
+                            val readableDay = try {
+                                val parser = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                                val formatter = SimpleDateFormat("EEE", Locale.getDefault())
+                                formatter.format(parser.parse(stat.dateStr)!!)
+                            } catch (e: Exception) {
+                                "Day"
+                            }
+                            Text(
+                                readableDay.uppercase(),
+                                fontSize = 9.sp,
+                                color = Color.White.copy(alpha = 0.4f),
+                                fontWeight = FontWeight.Bold
+                            )
                         }
-
-                        Icon(
-                            imageVector = if (viewCount == categoryModelsCount && categoryModelsCount > 0) Icons.Default.Check else Icons.Default.Info,
-                            contentDescription = "Category Done",
-                            tint = if (viewCount == categoryModelsCount && categoryModelsCount > 0) MetabolicGreen else ScannerCyan
-                        )
+                    } else {
+                        Text("-", fontSize = 10.sp, color = Color.White.copy(alpha = 0.4f))
                     }
                 }
             }
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Educational feedback tip
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A).copy(alpha = 0.4f)),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Focus Assessment Rule:", fontWeight = FontWeight.Bold, color = themeColor, fontSize = 13.sp)
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    "Your productivity percentage scales down if foreground screentime exceeds your custom limit in the settings tab. Keep track of metrics to optimize your lifestyle.",
+                    fontSize = 11.sp, color = Color.White.copy(alpha = 0.7f)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(40.dp))
+    }
+}
+
+// --- SCREEN 4: PERSONAL MOTIVATIONAL CONFIGURATIONS SCREEN ---
+@Composable
+fun PersonalSettingsScreen(viewModel: MainViewModel) {
+    val themeColor = getThemeColorTuple(viewModel.selectedThemeId).first
+    val scrollState = rememberScrollState()
+
+    var inputMotto by remember { mutableStateOf(viewModel.userMotto) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            "MOTIVATIONAL OPTIONS",
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Black,
+            color = themeColor
+        )
+        Text(
+            "Personalize parameters, mantra texts, and design schemes",
+            fontSize = 13.sp,
+            color = Color.White.copy(alpha = 0.6f),
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(bottom = 24.dp)
+        )
+
+        // Custom written motto text portal
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A).copy(alpha = 0.6f))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("YOUR PERSONAL MANTRA (WALLPAPER TEXT)", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 12.sp)
+                Spacer(modifier = Modifier.height(6.dp))
+                Text("Write anything here. It will display directly on your live wallpaper!", fontSize = 11.sp, color = Color.White.copy(alpha = 0.5f))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                TextField(
+                    value = inputMotto,
+                    onValueChange = { inputMotto = it },
+                    placeholder = { Text("Enter custom slogan...") },
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color(0xFF030712),
+                        unfocusedContainerColor = Color(0xFF030712),
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedIndicatorColor = themeColor,
+                        unfocusedIndicatorColor = Color.Transparent
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .testTag("motto_input"),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = { viewModel.saveMotto(inputMotto) },
+                    colors = ButtonDefaults.buttonColors(containerColor = themeColor, contentColor = Color(0xFF030712)),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text("Save Slogan")
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Premium Themes selector chips
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A).copy(alpha = 0.6f))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("STUDIO DESIGN SCHEMES", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 12.sp)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                val customThemes = listOf(
+                    Triple("neon_matrix", "Neon Matrix", Color(0xFF00FFCC)),
+                    Triple("cyberpunk", "Cyberpunk Pink", Color(0xFFFF007F)),
+                    Triple("aurora", "Aurora Violet", Color(0xFFA855F7)),
+                    Triple("oled", "OLED Stealth", Color(0xFFF59E0B)),
+                    Triple("batman", "The Dark Knight (B&W)", Color(0xFFFFFFFF))
+                )
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    customThemes.forEach { (id, label, col) ->
+                        val active = viewModel.selectedThemeId == id
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (active) col.copy(alpha = 0.15f) else Color.Transparent)
+                                .border(1.dp, if (active) col else Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                                .clickable { viewModel.updateTheme(id) }
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(label, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Box(modifier = Modifier.size(16.dp).background(col, CircleShape))
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Sliders & Toggles: Battery saver & Screentime Limit details
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A).copy(alpha = 0.6f))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("ECOLOGY ADJUSTMENTS", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 12.sp)
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Screen minutes limit slider
+                Text(
+                    "TARGET SCREEN LIMIT: ${viewModel.targetScreentimeMinutes.toInt()} MINS",
+                    color = Color.White.copy(alpha = 0.8f),
+                    fontSize = 12.sp
+                )
+                Slider(
+                    value = viewModel.targetScreentimeMinutes,
+                    onValueChange = { viewModel.saveTargetScreentime(it) },
+                    valueRange = 60f..480f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = themeColor,
+                        activeTrackColor = themeColor
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Switch for Low power optimizer
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("POWER OPTIMIZER MODE", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            "Lowers earth rotating resolution and FPS frame steps to increase hardware performance.",
+                            color = Color.White.copy(alpha = 0.5f),
+                            fontSize = 11.sp
+                        )
+                    }
+                    Switch(
+                        checked = viewModel.isBatterySaving,
+                        onCheckedChange = { viewModel.saveBatteryOptimization(it) },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = themeColor,
+                            checkedTrackColor = themeColor.copy(alpha = 0.4f)
+                        )
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(40.dp))
+    }
+}
+
+// --- STANDARD BOT BAR BOTTOM NAVIGATION DUMMY HUD ---
+@Composable
+fun BottomNavigationHud(viewModel: MainViewModel) {
+    val themeColor = getThemeColorTuple(viewModel.selectedThemeId).first
+    NavigationBar(
+        containerColor = Color(0xFF0F172A).copy(alpha = 0.9f),
+        tonalElevation = 8.dp,
+        modifier = Modifier
+            .navigationBarsPadding()
+            .height(64.dp)
+    ) {
+        val current = viewModel.currentScreen
+
+        NavigationBarItem(
+            selected = current == "home",
+            onClick = { viewModel.currentScreen = "home" },
+            icon = { Icon(Icons.Default.Home, contentDescription = "Dashboard") },
+            label = { Text("Display", style = MaterialTheme.typography.labelSmall) },
+            colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = themeColor,
+                selectedTextColor = themeColor,
+                indicatorColor = themeColor.copy(alpha = 0.15f),
+                unselectedIconColor = Color.White.copy(alpha = 0.4f),
+                unselectedTextColor = Color.White.copy(alpha = 0.4f)
+            )
+        )
+
+        NavigationBarItem(
+            selected = current == "wallpaper",
+            onClick = { viewModel.currentScreen = "wallpaper" },
+            icon = { Icon(Icons.Default.PlayArrow, contentDescription = "Wallpaper Guide") },
+            label = { Text("Wallpaper", style = MaterialTheme.typography.labelSmall) },
+            colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = themeColor,
+                selectedTextColor = themeColor,
+                indicatorColor = themeColor.copy(alpha = 0.15f),
+                unselectedIconColor = Color.White.copy(alpha = 0.4f),
+                unselectedTextColor = Color.White.copy(alpha = 0.4f)
+            )
+        )
+
+        NavigationBarItem(
+            selected = current == "stats",
+            onClick = { viewModel.currentScreen = "stats" },
+            icon = { Icon(Icons.Default.Menu, contentDescription = "Screen stats log") },
+            label = { Text("Stats", style = MaterialTheme.typography.labelSmall) },
+            colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = themeColor,
+                selectedTextColor = themeColor,
+                indicatorColor = themeColor.copy(alpha = 0.15f),
+                unselectedIconColor = Color.White.copy(alpha = 0.4f),
+                unselectedTextColor = Color.White.copy(alpha = 0.4f)
+            )
+        )
+
+        NavigationBarItem(
+            selected = current == "settings",
+            onClick = { viewModel.currentScreen = "settings" },
+            icon = { Icon(Icons.Default.Settings, contentDescription = "Options") },
+            label = { Text("Options", style = MaterialTheme.typography.labelSmall) },
+            colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = themeColor,
+                selectedTextColor = themeColor,
+                indicatorColor = themeColor.copy(alpha = 0.15f),
+                unselectedIconColor = Color.White.copy(alpha = 0.4f),
+                unselectedTextColor = Color.White.copy(alpha = 0.4f)
+            )
+        )
     }
 }

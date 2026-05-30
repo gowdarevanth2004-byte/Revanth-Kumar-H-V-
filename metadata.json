@@ -1,6 +1,6 @@
 {
-  "name": "BioLab 3D",
-  "description": "An interactive 3D biology learning experience featuring human anatomy, cell structures, genetics, progress tracking, and an AI biology tutor.",
+  "name": "Time Left",
+  "description": "Time Left is a motivational tracker and live wallpaper reminding you of the precious hours, minutes, and seconds left today, and days remaining in the current year, alongside screen-time and productivity statistics.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

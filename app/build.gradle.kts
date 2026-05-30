@@ -11,7 +11,7 @@ android {
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
-    applicationId = "com.aistudio.biolab3d.pwrvst"
+    applicationId = "com.aistudio.timeleft.gwyxsp"
     minSdk = 24
     targetSdk = 36
     versionCode = 1

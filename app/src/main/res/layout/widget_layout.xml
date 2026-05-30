@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="12dp"
+    android:background="@drawable/widget_bg_shape">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:layout_centerInParent="true">
+
+        <TextView
+            android:id="@+id/widget_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="TIME LEFT TODAY"
+            android:textColor="#9E9E9E"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.1" />
+
+        <TextView
+            android:id="@+id/widget_time_left"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="14h 23m"
+            android:textColor="#00FFCC"
+            android:textSize="26sp"
+            android:textStyle="bold"
+            android:fontFamily="sans-serif-condensed"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp" />
+
+        <TextView
+            android:id="@+id/widget_year_left"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="215 Days Left in 2026"
+            android:textColor="#ECEFF1"
+            android:textSize="11sp"
+            android:gravity="center" />
+
+        <TextView
+            android:id="@+id/widget_motto"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="MAKE EVERY SECOND COUNT."
+            android:textColor="#00FFCC"
+            android:textSize="9sp"
+            android:textStyle="italic"
+            android:paddingTop="6dp"
+            android:gravity="center"
+            android:ellipsize="end"
+            android:maxLines="1" />
+
+    </LinearLayout>
+
+</RelativeLayout>
